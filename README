@@ -1,0 +1,311 @@
+GramoSplit - Butcher Gramophile to automate the process of chopping up audio
+files into tiny fragments.  Butchering by Rick Bradley (rick@rickbradley.com).
+
+
+This is simply a butchering of GramoFile to create a single-purpose
+command-line tool.  I wish to be able to take a .WAV file and split it into
+tiny chunks by breaking on silence, as gramofile does, but with the parameters
+set in such a way that most segments are just a few seconds long for most audio
+sources.  I needed a batch tool to do this, and so extracted the minimal
+functionality I could, dropped the curses interface and put a trivial
+command-line processing front on it, and renamed the command 'gramosplit' in
+order to coexist peacefully with a real gramofile install.
+
+
+Original GramoFile README follows:
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+GramoFile - Gramophone records to CDs, Tick Reduction, Track Splitting
+Copyright (C) 1998 J.A. Bezemer
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version. 
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+for more details. 
+
+You should have received a copy of the GNU General Public License along
+with this program; if not, write to the Free Software Foundation, Inc.,
+675 Mass Ave, Cambridge, MA 02139, USA. 
+
+
+INTRODUCTION / OVERVIEW
+
+This is version 1.6 of GramoFile, released March 28, 2000. With this
+program you can record audio of (for example) gramophone records, process
+the signal and listen to the results. Because sound files of the
+.WAV-format are used, it is possible to exchange the files with many other
+programs. Cdrecord(1) can burn CD-Recordables of these, so you can make
+CDs with the music of your favorite records.  The user interface of
+GramoFile has a windows-like look-and-feel, making it fairly easy to use.
+
+One of the most important parts of GramoFile is the ability to process
+digital audio signals. Through the application of several filters it is
+possible to accomplish a significant reduction of disturbances like ticks
+and scratches. These filters have been programmed in such a fashion that
+they can be applied in a random order (and multiple times) in a single
+run, thus evading the use of temporary files. There is a possibility of
+adjusting the properties of each filter independently, so in every
+situation an optimal result can be achieved.
+
+Another interesting feature is the track splitting. Just make one .wav file
+of an entire side of an record and GramoFile will detect where the individual
+tracks are located. This happens fully automatically, without need to set
+any options. More experienced users may fine-tune the algorithm, or change
+the detected track starts and ends, but generally that will not be
+necessary. Track-times are saved in an editable (plaintext) .tracks file,
+that will be used during the signal processing to produce one processed
+.wav file for each individual track.
+
+To record and play .wav files, modified versions of brec(1) and bplay(1) 
+by David Monro are used. These programs provide buffered recording and
+playback, so all will go well even on a highly loaded system. Both
+programs have been supplied with the standard GramoFile user interface. 
+Brec also got a `graphical' peak level meter, and bplay a running time
+display. 
+
+
+INSTALLATION
+
+The file gramofile-1.6.tar.gz, available at
+
+    http://panic.et.tudelft.nl/~costar/gramofile/
+
+contains the complete C source code of the GramoFile program. To unzip it,
+type
+
+    tar xzvf gramofile-1.6.tar.gz
+
+or, alternatively,
+
+    gunzip gramofile-1.6.tar.gz
+    tar xvf gramofile-1.6.tar
+
+Change the working directory to the newly created directory gramofile-1.6
+and issue the command
+
+    make
+
+to start the compilation process. 
+
+
+Note for all 64-bit systems: when your `long'-type vars are 64 bit, .wav
+headers are not read/written correctly (=bug). If you replace every `long'
+with an `int' (or other 32-bit type), everything should be fine. 
+
+Note for non-Linux systems (like IRIX): check the Makefile first, you
+probably have to uncomment some lines. Also, you probably won't have sound
+recording/playing capabilities. If you experience portability problems,
+please fix them and send me a nice patch ;-) 
+
+Note for Solaris: there seem to be problems with the scandir() function
+not being present. It might be in the "SunOS/BSD Compatibility Library"
+(don't ask me...)
+Update: there is a scandir replacement in sun_scandir.c. To use it, add it
+to SRCS in the Makefile; also add a line
+  int alphasort(struct dirent **d1, struct dirent **d2);
+in the beginning of dirfilemenu.c.
+
+
+Note that the Makefile is written especially for use with GNU `make'
+(sometimes called `gmake'). That `make' implementation regards #included
+files as targets, enabling us to create and include dependency information
+in the same run as compiling the program. That's also the reason why those
+"file not found" messages appear: these files will be made and included
+automatically. More information on the GNU programs may be acquired by
+pointing your browser to http://www.gnu.org. If you don't have the GNU
+version of `make', you can simply comment the `include' line out; it is
+primarily useful during development activities.
+
+To run the GramoFile program, issue the command
+
+    gramofile
+
+
+USAGE NOTES
+
+General:
+ - The GramoFile program uses customized versions of `bplay' and `brec',
+    named `bplay_gramo' and `brec_gramo'. These programs are started
+    from within the `gramofile' program with just that names (no
+    directories). That means that they should be located in a directory
+    that is in your search path ($PATH), e.g. /usr/local/bin. But if
+    you don't want (or are not allowed) to put them there, add `.'
+    (current directory) to your search path, set your working directory to
+    the GramoFile directory and start the program with just `gramofile'
+    (the './' as in `./gramofile' should not be necessary). Note: this
+    is a known bug (if you like, send me a nice patch ;-).
+ - Information on CD burning issues may be found on:
+    http://www.fokus.gmd.de/nthp/employees/schilling/cdb.html
+
+Record an audio file: 
+ - Use the `Mixer' button in the file selection screen to start
+    xmixer(1). Make sure the appropriate input (and no other) is selected
+    for recording. SoundBlaster(TM) owners: note that treble and bass
+    settings affect recording! I found SB16PnP works better with both
+    sliders at 50%, Richard Robinson reports his SB64Gold requires treble
+    65%, bass 45%.
+ - If you choose `Cancel' during the "Press Enter to start recording" box,
+    the selected audio file has already been created/truncated, and will
+    have zero length. So if you were overwriting a file, it was already
+    deleted before this dialog box appeared.
+ - The length as reported in the .wav header of the recorded file is not
+    correct. This is because brec doesn't update the header if the
+    recording was stopped prematurely (by pressing Enter). If you have
+    problems with this, simply process the sound file with the `Copy Only'
+    filter; the output file has the correct length in the .wav header.
+    Alternatively, you can make some additions to the bplay/brec source
+    code...
+ - To get the best out of track location, you shouldn't record too much
+    silence before the first & after the last track. 3-5 seconds silence
+    will probably get the best results. Also, I don't recommend recording
+    two sides of a record in a single (long) sound file; make two files
+    instead.
+ - If you want to view the input signal level without recording to a
+    sound file, try recording to /dev/null ;-)
+
+Copy audio from an audio-CD to a file:
+ - This option is not yet implemented. There are some plans to program a
+    uniform user interface to the cdda2wav(1) program here. You have to
+    use the bare program for this moment. More info:
+    ftp://ftp.gwdg.de/pub/linux/misc/cdda2wav
+    Alternatively, you can try the cdparanoia(1) program:
+    http://www.mit.edu/afs/sipb/user/xiphmont/cdparanoia/
+
+Track location: 
+ - Track location information is saved in a plaintext file with the same
+    name as the audio file but appended with ".tracks", as in
+    "firaru_side1.wav.tracks". You may view/use/edit this file as you
+    please. 
+ - The ".tracks" file will be written in the same directory as the sound
+    file. If that directory is not writable, create a symlink to the
+    sound file from a directory like "/tmp/gramofile", and use that `new'
+    sound file instead. 
+ - For more information on the algorithms used, and the procedure you
+    should follow to get optimal track location, see the Tracksplit2.txt
+    file.
+ - If you want to view the (optionally generated) .med or .sor files with
+    gnuplot, you may use a gnuplot-command like:
+          plot '/dir/filename.wav.med' using 2 smooth unique
+    or to view only a certain interval:
+          plot [1000:2000] '/dir/filename.wav.med' using 2 smooth unique
+
+Process the audio signal:
+ - If you choose to split tracks, numbered files will be created with the
+    `output filename' as base. If the `output filename' is entered as
+    "/tmp/test.wav", files like "/tmp/test01.wav", "/tmp/test02.wav", etc. 
+    will be created. You will be warned if a file "/tmp/test.wav" exists,
+    although it will not be overwritten, but the 01, 02, etc. files will
+    be overwritten without your consent. Be warned! (This is also a bug.)
+ - You can also pipe the output data directly to some command that accepts
+    .wav-format input via stdin, when using a "filename" like
+    `|progname args outfile.ext'. Popular example: `|bladeenc -quiet STDIN
+    processed.mp3'. If track splitting is done, there _must_ be something
+    like a filename at the end of the line; e.g. the `.mp3' will be
+    replaced by `01.wav', `02.wav' etc. (Always `.wav', this is a bug.)
+    A new command is executed for each track. Note: 1) if the name can't
+    be the last item on the line, write a shell-script wrapper; 2) the
+    output file must be read once and in-order, which some programs (like
+    LAME!) can't do. Easily fixed with a script that first saves the data
+    to a .wav tempfile, then performs the wanted action, and finally removes
+    the tempfile.
+ - For more information on some of the implemented filtering algorithms,
+    and the implementation of new filters, see the Signproc.txt file. 
+ - Known problem: the algorithm for the Conditional Median Filter II is not
+    optimal. With certain musical instruments and tones, the sound might
+    get distorted by an annoying `shot noise'. This is because those
+    instruments produce sawtooth-like sound waves, containing lots of high
+    frequencies. The `normal' highpass filter used by the CMF II detects
+    these high frequencies as ticks. You can solve this problem in two
+    ways. First, you may try to increase the tick detection threshold
+    (second threshold) to for example 7000 or higher. Second, you can try
+    to use an alternative highpass filter, by #defineing either FOURTH_ORDER
+    or SIXTH_ORDER in signpr_cmf2.c. These highpasses enhance very high
+    frequencies, so real (short) ticks are detected better, even when using
+    higher thresholds.
+ - Hint: if you are doing mono 78's, it might be profitable to use a
+    convert-to-mono filter first. You'll still get a stereo output file,
+    but with both channels identical. Use sox(1) or the like to convert it
+    to a real mono file.
+
+Write an audio CD: 
+ - This option is not yet implemented. There are some plans to program a
+    uniform user interface to the cdrecord(1) program here. You have to
+    use the bare program for this moment. Try something like
+
+    cdrecord -v speed=2 dev=0,2,0 -audio -pad track01.wav track02.wav ... 
+
+    Actual information on cdrecord may be found on:
+    http://www.fokus.gmd.de/research/cc/glone/employees/
+                                     joerg.schilling/private/cdrecord.html
+
+    If you like a graphical front-end to write CD's, try the xcdroast
+    program:
+    http://www.fh-muenchen.de/rz/xcdroast
+    (Note: you may have to use the wav2cdr utility.)
+
+Play an audio file: 
+ - Make sure the PCM and Master volumes are set high enough, and your
+    speakers are plugged in correctly and turned on ;-)
+ - I find the `Track' field to be extremely useful. If I've had located
+    tracks, I use one xterm with GramoFile, and another one with a editor
+    with the .tracks file. If I don't agree with the automatic detection,
+    I change the .tracks file, save it, and listen to the new beginning
+    and end in GramoFile. Note that the .tracks file is reread every time
+    you press B, E, F, A or Enter.
+ - To notice differences between filtered/non-filtered sound files, you've
+    got to have speakers that are fit for that purpose. I've found that big
+    speakers are quite `slow' and have a natural ability to reduce tick
+    volume, because they can't keep up with the speed. To be able to hear
+    the ticks as they are, little speakers are most useful, but small,
+    "low-quality" headphones (as used with cheap portable audio) are even
+    better.
+
+BUGS
+
+Plenty. Like max string lengths, un-free-d memory, bad error-handling. But
+if you don't do too extraordinary things, you shouldn't notice anything. 
+The source code is definitely not portable (well, IRIX runs fine...). 
+There is no manpage. There are no commandline options - so why bother
+about a manpage? Only text mode.  Screensize is always 80x24. Only
+CD-quality .wav files are accepted (well, that was the purpose, wasn't
+it?). There are major language errors everywhere (please send me
+corrections). `make install' doesn't work. 
+
+But I expect too have only very limited time to do something about all
+them bugs. You may report bugs at any time, direct them to
+J.A.Bezemer@ITS.TUDelft.NL. Completely worked out fixes are greatly
+appreciated ;-) 
+
+
+AUTHORS
+
+GramoFile was developed by Anne Bezemer and Ton Le, students of the
+department of Information Technology and Systems (ITS), sub-department of
+Electrical Engineering (ET) of the Delft University of Technology (TU
+Delft). The first major part was written during the `Integraal Project
+Practicum' (IPP) in the spring of 1998. However, development has continued
+unofficially thereafter (so now we have track splitting operational :).
+Total development time is about 7 weeks full-time. 
+
+The following persons have been very helpful and/or supportive during the
+`official' part of the project: A.P. Thijssen, E.A. Hendriks, A. Redert,
+J.A.H. Snelders, L. Meijs and R.J. de Gruijl. Other persons are mentioned
+in the ChangeLog file. 
+
+Any questions, comments, suggestions and bugfixes may be mailed to
+J.A.Bezemer@ITS.TUDelft.NL (or try costar@panic.et.tudelft.nl or
+mcbzmr@dds.nl). But please understand that I'm a student with very limited
+time to do the more pleasant things in life.
+
+Have fun!
+
+
+--
+All mentioned trademarks and registered trademarks are the property of their
+respective owners. 

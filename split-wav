@@ -1,0 +1,28 @@
+#!/bin/sh -x
+
+
+# split-wav:  taking a wav file, run gramosplit over it (to produce bunches of
+# little wav files), and then conver the little wavs to mp3s
+#
+#     Rick Bradley (rick@rickbradley.com)
+
+RM=/bin/rm
+GRAMOSPLIT=/usr/local/bin/gramosplit
+LS=/bin/ls
+SED=/bin/sed
+BASENAME=/usr/bin/basename
+SH=/bin/sh
+LAME=/usr/local/bin/lame
+EGREP=/bin/egrep
+SOX=/usr/bin/sox
+
+SOURCE=$1
+FILE=`${BASENAME} ${SOURCE} | ${SED} 's:\.wav$::'`
+DIR=`echo ${SOURCE} | ${SED} 's:^\([^/]*\)$:./\1:' | ${SED} 's:/[^/]*$:/:'`
+
+
+${GRAMOSPLIT} "${DIR}${FILE}.wav" 2500 100 5 10 2 3 && \
+${RM} "${DIR}${FILE}.wav" && \
+${RM} "${DIR}${FILE}.wav.tracks" && \
+${RM} "${DIR}${FILE}.wav.rms" && \
+${LS} "${DIR}" | ${EGREP} -e "^${FILE}-part-[0-9]+.wav$" | ${SED} 's:^\(.*\)\.wav$:'${LAME}' "'${DIR}'\1.wav" "\1.mp3"; '${RM}' "'${DIR}'\1.wav":' | sh -s -x

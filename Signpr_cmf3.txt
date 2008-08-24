@@ -1,0 +1,42 @@
+SIGNPR_CMF3
+===========
+
+James Tappin: April 2001
+
+Signpr_cmf3 is a modification of signpr_cmf2, which uses a
+frequency-domain method to fill in the ticks.
+
+Why?: Because although cmf2 does an excellent job of detecting ticks,
+it makes a horrid mess of interpolating those that are close the peak
+of a sound wave (a situation which occurs very often on some 78's --
+indeed on some of my record the majority of the clicks are on peaks)
+and the resulting sound can then be worse than the original.
+
+What to do?: Since cmf2 does a very good job of picking out ticks that
+bit is unchanged, my goal here was to find a way that would smooth over
+the tick without cutting off more-or-less a half-cycle of the sound
+wave. Since the tick is located at the peak, and zeroth (the original
+cmf2) or first (FANCY_FILL) order interpolation will cut off the peak
+and thus cause an acoustically unpleasant breakup of the
+sound. Therefore I have here attempted to take a FFT of a region around
+the tick then exclude frequencies corresponding to features of the
+length of the tick or smaller. In the present version this is done by
+setting the components above this frequency to zero.
+
+Problems: It's slow -- If I could see a way to do 1 fft per tick rather
+than 1 fft per interpolated point it could go much quicker, but I don't
+see that this can be done within the gramofile buffers framework.
+
+What does it need: The fft's are done using the "fastest fourier
+transform in the west" http://www.fftw.org/ which attempts to find an
+optimum  way of doing the fft for the architecture and the size of the
+transform. In order to hold the fft plans and the length of the fft, 3
+new fields are added to the parampointer variable.
+
+Settings: The tick identification algorithm is identical with that used
+in cmf2 and the settings are therefore the same. The choice of fft
+length is determined as: Too large a value will slow the computation
+(remember fft is an n log(n) process), while too small a value results
+in a poor smoothing as the side lobes of the tick are have a larger
+effect on the values. The default is 2^9 (512).
+

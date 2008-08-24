@@ -1,0 +1,313 @@
+
+
+
+
+
+
+||  NOTE: This document describes the track location algorithms found in
+||  versions 1.0 - 1.3 of GramoFile. The new algorithm found in version 1.4
+||  and up is described in the file Tracksplit2.txt. 
+
+
+
+
+
+
+
+                          Track Splitting in GramoFile
+
+                 A successful approach to a problem of old times
+
+
+
+                                           By J. A. Bezemer
+                                           J.A.Bezemer@ITS.TUDelft.NL
+                                           Last update: 07/07/1998
+
+                                           GramoFile website:
+                                           http://cardit.et.tudelft.nl/~card06
+
+
+INTRODUCTION
+
+Only a few years ago, gramophone records were the most popular way of
+distributing music. These days, their place has been taken entirely by
+Compact Discs. Some of the most popular records have been digitally
+remastered, and CDs with music from the `good old times' have been
+pressed. After the introduction of CD-Recordables and CD Recorders for use
+with Personal Computers, some people started making CDs from their own
+records. It is desirable to have tracks on the CD just as they were on the
+original gramophone record. This can be done by sampling each individual
+track of the record to a seperate audio file on the harddisk of the PC,
+and then use a piece of CD writing software that can make separate tracks
+of a row of audio files. This way, the sampling process is laborious and
+requires constant attention.
+
+In this document, a process is described that automates the separation of
+tracks. An entire side of a record is sampled to one big audio file, and
+an intelligent piece of software automatically detects where tracks begin
+and end. This process has been implemented in the GramoFile program, that
+is also capable of applying anti-tick signal processing to audio files.
+The routines of that program will be mentioned a few times in this
+document.
+
+
+REDUCTION OF DATA
+
+The size of a CD-quality audio file (.wav format) that represents sampled
+audio of a gramophone record, is about 200 megabytes. This is far more
+data than is needed to compute track starts and ends. Therefore, a large
+scale reduction of the data is possible. It is also necessary, because
+processing several hunderd megabytes of data will take far too long to be
+useful, even on the fastest computers available.
+
+One way to characterize tracks with respect to inter-track silence, is the
+fact that the signal power (or volume) is higher. The signal power may be
+computed with the root-mean-square (RMS) expression
+
+                                __________________________
+                               /       i=0
+                          _   /   1    ---             2
+    y[t] = RMS(x[t]) =     | /   ---   )     ( x[t+i] )
+                           |/     N    ---
+                           /           N-1
+
+
+with N the `length' of the RMS operation.
+
+When calculating the RMS of an audio signal for tracksplitting purposes, a
+good choise for the length is one tenth second. Then there are enough
+samples to compute an accurate RMS (4410 when using CD-quality sampling),
+there are sufficient (typ. >30) RMS-points within an inter-track silence,
+and the total number of RMS points is limited enough to fit completely in
+a computer's memory (typ. <100 kB).
+
+If stereo signals are used, there may be some soft signal at one channel,
+while there is only silence on the other channel. Therefore, it is
+advisable to compute the RMS of both channels separately, and then store
+the maximum of the two values in a RMS list (array).
+
+Figure 1 dipalys an example sequence of RMS data.
+
+
+                                            |     |
+             |     ||                   ||  ||  |||             ||  |  ||
+       |  | || |||||||                 ||||||||||||||           ||| ||||||
+      ||||| ||||||||||||              |||||||||||||||||         ||||||||||
+      ||||||||||||||||||              |||||||||||||||||        |||||||||||
+      |||||||||||||||||||            ||||||||||||||||||       ||||||||||||
+     |||||||||||||||||||||          ||||||||||||||||||||      |||||||||||||
+     |||||||||||||||||||||||     |||||||||||||||||||||||     ||||||||||||||
+ |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+  ^                           ^                           ^                 ^
+ silence                   silence                     silence         silence
+
+  Figure 1. Example sequence of RMS data. Tracks are recognized
+  immediately as they have a much larger RMS value than silence. 
+
+
+
+BEAUTIFYING THE RMS DATA
+
+The RMS data is rather `raw', and contains a number of `ticks'. To
+beautify the data a little, a median filter can be used. This filter, that
+is described in detail in the file Signproc.txt, has the property that it
+filters out short disturbances. After median filtering with a length of 3,
+the RMS data looks much more `neat'.
+
+
+DETERMINING THE SILENCE THRESHOLD
+
+When the median-filtered RMS data is studied more closely, it becomes
+clear that during the inter-track silence, there is no silence at all. To
+the contrary, the average signal power (that's the RMS) is relatively
+high. That is because a gramophone record has little disturbances
+everywhere, like ticks or the relatively rough surface the needle rests
+upon.
+
+However, there still is a clearly defined separation bewteen the various
+tracks, at least to humans that look at the median filtered RMS data. 
+Inter-track silence is characterized as such by a prolonged period of a
+very low RMS value. The questions that need to be answered are therfore
+how long the interval must be, and what the `very low RMS value' is. The
+former may be answered immediately, as practically all records have 5, but
+certainly more that 3, seconds of silence between tracks. The latter is
+more complex, for it will be different for all records. Thus, a method
+needs to be developed for the automatic deduction of the correct `silence
+threshold' of the RMS value. 
+
+A very interesting observation can be made if the RMS data is sorted by
+value. This is depicted in figure 2.
+
+
+                                                                             |
+                                                                            ||
+                                                                          ||||
+                                                                        ||||||
+                                                                    ||||||||||
+                                                ||||||||||||||||||||||||||||||
+                            ||||||||||||||||||||||||||||||||||||||||||||||||||
+               |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+             |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+ |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+      ^                                        ^
+ collected silence                           music
+
+  Figure 2. Example of RMS data that is sorted by value.
+
+
+It is clear, that all silence values are moved to the left of graph, and
+all music values to the right. When we walk through the graph from left to
+right, first we encounter a lot of silence. When the silence is over, the
+music starts. And an interesting phenomenon occurs just there, namely that
+there is a very quick transition from the silence level to the soft-music
+level. Theoretically, this was to be expected, since even soft music must
+be well above a certain power level, to maintain a reasonable
+signal-to-noise ratio. The values that occur between silence level and
+soft-music level arise from fade-in and fade-out effects. 
+
+The middle of this sharp level-transition is easily detectable by
+computing the differential for each position, as in
+
+    diff(x[t]) = x[t+5] - x[t-5]
+
+The `differential-length' of 11 is taken that large to enhance the desired
+effect. In figure 3, an example of the differential is displayed. 
+
+
+                                                                             |
+                                                                            ||
+              |                                                            |||
+              |                                                          |||||
+             |||                                                     |||||||||
+             |||||                                                ||||||||||||
+             ||||||   ||     ||  ||||               |||||    |||||||||||||||||
+            |||||||||||||| ||||||||||||||||  |||||||||||||||||||||||||||||||||
+ ||       ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+ |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+              ^
+           maximum
+
+  Figure 3. Example of differentials of the sorted RMS data.
+
+
+Where the differential reaches its maximum (to be more precise, the
+maximum of the first part), the slope of the sorted RMS data is maximal.
+As pointed out above, this point doesn't really belong to either silence
+or music. And, as could be expected, it turns out that this value is
+perfectly useable as silence threshold.
+
+Note that this threshold is decuded completely from the signal itself, and
+its inherent (theoretically plausible) properties. No user-interaction is
+either necessary or possible.
+
+
+BETTER ESTIMATION OF STARTS AND ENDS
+
+The first detection of inter-track silence takes place by walking through
+the median filtered RMS data, searching for locations where the RMS value
+is below the silence threshold for a period of minimally, say, 30
+tenth-seconds. This way, the silences begin and end on the places where
+the silence threshold is crossed. Usually, these positions are not quite
+correct, as the fade-ins and fade-outs are not handled correctly. 
+
+Thus problem may be addressed by finding another (lower) threshold, that
+excludes fade-ins and fade-outs from the inter-track silence. Generally,
+these new thresholds are different for each individual inter-track silence
+on the record. So, another way of deducing the new threshold must be
+developed.
+
+A quite straightforward way of doing this, is to compute the mean of all
+RMS values in the silence, and setting the threshold a few percent above
+this mean. To find a correct mean, a few (e.g. 5) points at the beginning
+and end of the `coarse' silence are excluded, to prevent the fade-ins and
+fade-outs from pulling the mean too high. In praxis, a threshold of 8%
+above the (local) mean (1,08 times the local mean) is generally found to
+be acceptable.
+
+The median-filtered RMS data is now scanned from the previously detected
+start of the silence forward and from the end backward to the first and
+last points the RMS drops below the new threshold. These new points are
+incremented, respectively decremented, again by a fixed number of points
+(e.g. 3) to account for all possible circumstances.
+
+Note that this method requires one user-specifiable parameter, namely the
+percentage of the threshold above the local mean. However, the mentioned
+value of 8% should be correct for most cases. 
+
+
+THE LIST OF TRACKS
+
+If the silences are detected, there is no problem in building a list of
+track starts and ends. For music is there where no silence is. But there
+may be `fake' tracks at the beginning and end of the big audio file, so an
+extra selection may be appied, for example discarding all tracks that are
+shorter than 5 seconds.
+
+
+IMPLEMENTATION IN GRAMOFILE
+
+The method for splitting tracks as described above, has been implemented
+in the GramoFile program. It is accessible with the `Determine track
+separation points' in the main menu. After the selection of the audio file
+that is to be splitted, a screen appears with several adjustable
+parameters. The first parameter is the length (in samples) of the volume
+blocks. With CD quality sampling, there are 44100 samples per second, so
+one tenth second is 4410 samples. Then there is the local silence
+threshold (in percent), minimal length of inter-track silence and tracks
+themselves, and the number of blocks that should be added to tracks after
+the fine-detection. All these parameters are described above.
+
+Because the computation of the RMS values (signal power / volume
+information) takes rather long, there is an option to save/load the RMS
+data in/from a .rms file (.rms appended to the audio file name, like
+side_1.wav.rms). If the .rms file does not exist, or if it is made with
+another block-length as requested, it is (re-)generated. This may take
+quite a while, dependant on the speed of the computer used. If the .rms
+file is present and useable, it will be used right away, so the time
+consuming recalculation is avoided. In that case, the audio (.wav) file
+is not accessed. 
+
+Finally, there is an option `Generate graph files'. When this option is
+turned on, a few files will be created, namely: 
+ - .med  : graph of the median filtered RMS data, like figure 1
+ - .sor  : graph of the sorted median filtered RMS data, like figure 2
+ - .dif  : graph of the differential of the sorted data, like figure 3
+ - .drms : RMS filtered version of the .dif file
+
+GramoFile actually uses a RMS filtered version of the differential to
+detect the maximum slope in the sorted data.
+
+When track detection is done, a .tracks file will be written. This file
+will be used by the Signal Processing to create separate audio files for
+each track mentioned in the .tracks file. The .tracks file is a .ini-style
+plaintext file, and may be edited. Currently, only the Track??start end
+Track??end values are used (and the Number_of_tracks of course); the
+others are mainly for your own reference. The various graph files provide
+much information that can be used to verify or correct the times mentioned
+in the .tracks file.
+
+
+RESULTS AND CONCLUSION
+
+With the GramoFile program, several gramophone records have been recorded,
+and have had their tracks split. The results were very satisfying. That is
+mainly because practically all required parameters are deduced from the
+audio signal itself. Some more tests will be performed, in order to
+guarantee the correctness of the algorithm in most circumstances.
+
+On the GramoFile website, http://cardit.et.tudelft.nl/~card06, a few
+examples of the various graph files are published.
+
+If you encounter a situation in which the track splitting doesn't function
+properly, you can contact me about it. Please include gzip'd versions of
+both the .rms and .tracks files you have problems with, and describe your
+problem as clearly and completely as possible. Also, corrections,
+additions, suggestions and compliments are heartily welcomed. Contact
+information is in the general `README' file. 
+
+
+

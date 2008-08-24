@@ -1,0 +1,102 @@
+GramoSplit Change Log
+
+version 0.01: 
+
+ - Butchered GramoFile out of recognition to extract a simple command-line tool
+ for splitting an audio file into tiny little pieces.  Rick Bradley
+
+GramoFile Change Log
+
+version 1.6:
+
+- Included semun definition that disappeared from glibc2.1 headers. Bart
+   Warmerdam was the first to submit this to the Debian Bug Tracking system.
+- Allow piping the signal processing's output to any command (MP3
+   encoders!), thanks to Geoff Clare. See README for details.
+- Settings for filtering are now remembered within one run, which makes
+   it much easier to try slight variations in the settings. Patch by
+   James Tappin.
+- New convert-to-mono (=average-channels) filter, also by James Tappin.
+- James Tappin also provided an alternative way of interpolation for the
+   CMF-II, using an L1 norm linear fit. It's much slower; you can compile
+   it in by defining FANCY_FILL in the beginning of signpr_cmf2.c.
+- Reverted curses to ncurses per default, should now compile fine on SuSE.
+   For the old curses, change $LIBS in the Makefiles and use -DOLD_CURSES.
+- Keith Refson sent a scandir() replacement function for Solaris; see the
+   README for info on how to use it.
+- For byte-swapped systems, the length-fields in the .wav header are
+   now byte-swapped too; patch also by Keith Refson.
+- FreeBSD patches by Juergen Lock.
+- Applied fix for a buffering deadlock at the end of recording, also by
+   Juergen Lock.
+- James Tappin ported Dave Platt's out-of-phase tick detection (see v1.3)
+   to the `old' CMF filter; search for TEST_DAVE_PLATT in signpr_cmf.c.
+- Fixed bug in the parameter screen of the double median filter.
+
+version 1.5:
+
+- Signal Processing 30-50% faster, thanks to a few "old programmers'
+   tricks" provided by Dave Platt.
+- Fix for computation of file offsets and -lengths for long files in
+   bplay, and 12 bit/sample should now work correctly, too. Patch by Ralf
+   Schlatterbeck.
+- Should compile & run on IRIX (and maybe others), too. Joshua Weage sent
+   me a patch, which I interpreted a little more generally. More info in
+   the README file.
+
+version 1.4:
+
+- `Determining of track separation points' is now called simply
+   `Track location'.
+- Totally new track location algorithm that should work well in far more
+   cases than you're used to ;-)  Read more in Tracksplit2.txt.
+- Should compile OK with egcs; patch by Daniel Kobras.
+
+version 1.3:
+
+- Considerable speed improvement in Signal Processing (and Track Splitting,
+   too) by using the stdio functions, patch provided by Axel Kohlmeyer.
+   (Why didn't anyone tell me speed(fread)>>speed(read) before..?)
+- Deleting filters in Filter Selection screen now also works on the console
+   (using the R key), again thanks to Axel Kohlmeyer. (I'm always in X ;)
+- Info-screen after recording, great idea of Richard Robinson.
+- Dave Platt reported that most ticks are out-of-phase, so tick detection
+   should look at the left-minus-right (difference) signal. I've programmed
+   this in signpr_cmf2.c (search for TEST_DAVE_PLATT) but not tested it;
+   it's not used by default. If you like, you may experiment with it - and
+   tell me your findings.
+
+version 1.2:
+
+- Added variable median (interpolation) length to the Conditional
+   Median Filter, and called it CMF II, so the original is still
+   there. The CMF II gives much better results than the original CMF.
+- Added the possibility of playing whole tracks, or a few seconds at
+   the beginning/end of a track or before/after a track - with a single
+   keystroke. Makes life a lot easier.
+- Added a Copy Only `filter' that only copies the signal. Useful for
+   splitting tracks without processing the signal. Requested (more or
+   less) by Richard Robinson.
+- Added a Experimenting Filter with which you can experiment. See the
+   file signpr_exper.c
+- Corrected writing of .wav header - bytes_per_sample seems to be 4
+   instead of 2 (as found in bplay.c). Thanks to Pavel Kasparek for
+   reporting it.
+- Several other small changes.
+
+version 1.1:
+
+- Track splitting operational
+- Documented signal processing and track splitting
+- English user interface
+- Removed some annoying bugs
+- Cleaned up source code and used indent(1)
+- Webpage at http://cardit.et.tudelft.nl/~card06
+- Done a lot of other things
+
+version 1.0:
+
+- First `official' non-public release, at the end of the `Integraal Project
+   Practicum', without track splitting, without full documentation (.txt
+   files) and a Dutch user interface. 
+

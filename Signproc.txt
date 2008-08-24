@@ -1,0 +1,731 @@
+
+
+
+
+                         Signal Processing in GramoFile
+
+      A discussion of implemented filters, framework and technical details
+
+
+
+                                           By J. A. Bezemer
+                                           J.A.Bezemer@ITS.TUDelft.NL
+                                           Last update: 07/13/1998
+
+                                           GramoFile website:
+                                           http://cardit.et.tudelft.nl/~card06 
+
+
+INTRODUCTION
+
+The processing of digital signals is a major part of the GramoFile
+program. This processing is done by so-called filters, as in the
+`Conditional Median Filter'. To allow easy programming and application of
+these filters, a flexible framework has been implemented. This allows
+filters to be used in a random order (even multiple times) in one single
+run. Each filter has its own set of (user-changeable) parameters. This may
+be visualized as shown below.
+
+
+   ___________         ________          ________         ___________
+  |           |       |        |        |        |proc'd |           |
+  | Harddisk  |signal |        |        |        |signal | Harddisk  |
+  |           |------>|Filter 1|- - - ->|Filter N|------>|           |
+  | .wav file |       |        |        |        |       | .wav file |
+  |___________|       |________|        |________|       |___________|
+
+  Figure 1. The signal processing structure.
+
+
+The GramoFile user interface is used to specify what filters should be
+used, and in what order. The parameters of each filter may also be changed
+using the user interface. This is the option `Process the audio signal' in
+the Main Menu.
+
+In this version of GramoFile, four filters have been implemented:
+ - Simple Mean Filter
+ - Simple Median Filter
+ - Double Median Filter
+ - Conditional Median Filter
+
+In the remainder of this document these four filters will be described in
+more detail. Also more information is given on the filter framework, and
+how to implement new filters. 
+
+
+SIMPLE MEAN FILTER
+
+The Simple Mean Filter is the most simple filter in GramoFile. It takes
+the (unweighted) mean of an adjustable number of samples, see figure 2
+below. 
+
+
+  input signal    x[t-3]  x[t-2]  x[t-1]  x[t]  x[t+1]  x[t+2]  x[t+3]
+                         \______________        ______________/
+                                        \      /
+                                          Mean
+                                           |
+                                           V
+  output signal   y[t-3]  y[t-2]  y[t-1]  y[t]  y[t+1]  y[t+2]  y[t+3]
+
+
+  Figure 2. The Simple Mean Filter.
+
+
+In a mathematical expression:
+
+                      i=-N
+                1     ---
+       y[t] =  ----   )    x[t+i]
+               2N+1   ---
+                       N
+
+where the `length of the filter' is 2N+1; in figure 2 the length is 5, so
+there N=2.
+
+The effect of this filter on an audio signal with ticks, is that the ticks
+will be `spread out', and be somewhat reduced in strength. However, they
+still remain clearly audible. But also the `clear' audio signal is
+affected. With filter lengths greater than 5, the quality of the output
+audio signal degrades rapidly. This filter behaves like a crude lowpass
+filter.
+
+
+SIMPLE MEDIAN FILTER
+
+The Simple Median Filter computes the median of an adjustable number of
+samples. A well-known property of a `running median' is its ability to
+filter out short impulses (like ticks) in a signal.
+
+The median of a row of numbers is the middle one if the row is sorted by
+value. To find the median of the numbers 5, 3, 8, 1, 2, we sort them
+first, resulting in 1, 2, 3, 5, 8, and then take the middle one, 3 (note
+that the mean is different, namely 19/5 = 3.8).
+
+The impulse-filtering property is illustrated in figure 3, where a
+(distorted) signal is filtered with a running medians of length 3 and 5,
+so every time the median of 3 or 5 samples is taken. 
+
+
+   input signal:            median-3 filtered:       median-5 filtered:
+
+       |      | |                       |
+       |     |||| |                   |||||                    |||||
+       |    ||||| |                  ||||||                   ||||||
+   ||  | || ||||| || |      ||   |||||||||||||         |  |||||||||||||
+   ||| |||||||||| |||||     ||||||||||||||||||||     ||||||||||||||||||||
+
+   22105122134545042121     22111222234454422211     11211222234444422211
+
+  Figure 3. Examples of running medians with lengths 3 and 5.
+
+
+In figure 3, it is clear that all disturbances have disappeared in the
+filtered signals. To be more precise, all disturbances with a length of 1
+and 2, respectively, are filtered out. Generally, a median of 2N+1 samples
+will filter out all disturbances with a length smaller than or equal to N.
+
+In audio signals, ticks tend to have a length of more than, say, 5 samples
+(CD-quality sampling). So when median filtering with length 11 is applied,
+most ticks disappear. But also the sound itself is badly affected. Most of
+the high frequencies are lost, and an annoying noise is added to the
+signal.
+
+This filter may be used to determine the best size for the median
+filtering of the Conditional Median Filter.
+
+
+DOUBLE MEDIAN FILTER
+
+The Double Median Filter is described by R.R. Lawrence (et al.) in
+`Applications of a Nonlinear Smoothing Algorithm to Speech Processing',
+IEEE Transactions on Acoustics, Speech, and Signal Processing, Vol.
+ASSP-23, No. 6, Dec 1975. It is composed of a `normal' median filter and a
+median filter that filters the error (disturbance) signal. It is depicted
+in figure 4.
+
+                 ________
+    input       |        |                          +     output
+    -------+--->| Median |-----+--------------------->O--------->
+           |    |________|     |                      ^ +
+           |                   |                      |
+           |                   |         ________     |
+           |                   V -      |        |    |
+           +------------------>O------->| Median |----+
+                              +  error  |________|
+
+
+  Figure 4. Block diagram of the Double Median Filter.
+
+
+The idea is, that the addition of the median of the error signal should
+enhance the quality of the output signal. But during tests, there was not
+too much audible difference with the Simple Median Filter.
+
+
+CONDITIONAL MEDIAN FILTER
+
+The Conditional Median Filter is described in detail by T. Kasparis (et
+al.) in `Adaptive Scratch Noise Filtering', IEEE Transactions on Consumer
+Electronics, Vol. 39, No. 4, Nov 1993. The basic functionality is 1)
+detect ticks, 2) interpolate if there is a tick.
+
+Ticks are mostly `composed of' high frequencies. Undisturbed audio signal
+(especially from gramophone records) only has relatively low frequencies. 
+This observation is used to detect ticks and scratches. The interpolation
+is performed by a median filter, see above (Simple Median Filter) for its
+interpolating properties. 
+
+The block diagram of the Conditional Median Filter is shown in figure 5.
+
+
+                                                 __________
+  input x[t]                                    |          |  output y[t]
+  ----------+---------------------------------->|  Median  |------------->
+            |                                   |  Filter  |
+       _____V_____                              |__________|
+      |           |                                   ^
+      | Highpass  |                                   |
+      | Filter    |                                   | g[t]
+      |___________|                                   |
+            |                                    _____|_____
+            | w[t]                              |           |
+            +---------------------------------->|           |
+            |    _____       ___________        | Gate      |
+            |   |     |     |           |       |           |
+            |   | |   |     | Recursive |  b[t] | Generator |
+            +-->| V K |---->| Median    |------>|           |
+                |_____|     | Filter    |       |___________|
+                            |___________|
+
+  Figure 5. Block diagram of the Conditional Median Filter.
+
+
+The highpass filter in reality is a combination of a second-order
+derivative, and a Root-Mean-Square filter. The second order derivative is
+
+    z[t] = x[t-1] - 2 x[t] + x[t+1]
+
+and the RMS is
+
+                    --------------------------
+                   /        i=-N
+              _   /    1    ---             2
+    w[t] =     | /   ----   )     ( z[t+i] )
+               |/    2N+1   ---
+               /             N
+
+where 2N+1 is the `length' of the RMS operation. The resulting signal w[t]
+has large values if there is a tick, and is very `quiet' otherwise.
+
+But w[t] is not 0 if there are no ticks, it has a certain `background
+noise' level. That background level is estimated by taking the median of a
+large number of samples of w[t]. The best results are accomplished using a
+recursive median filter, defined as
+
+    y[t] = median ( y[t-M], ... , y[t-1], x[t], x[t+1], ... , x[t+M] )
+
+where x[t] is the input and y[t] the output. To reduce calculation time,
+the signal w[t] is decimated first (only one of K samples is considered). 
+The estimated background level resulting from decimation and recursive
+median filtering is b[t]. 
+
+The gate generator is (currently) nothing more than a simple condition,
+namely
+
+             /           w[t] - b[t]
+            |   1,  if   -----------  >  C
+            |                b[t]
+    g[t] = <
+            |
+            |   0,  otherwise
+             \
+
+where C is a certain factor, for example 2.5. If the gate signal g[t] is
+1, the `main' median filter is `switched on', letting it compute medians,
+otherwise the signal x[t] passes unchanged.
+
+In the Properties screen of the Conditional Median Filter, several
+parameters van be changed:
+ - Length of the `main' median filter
+ - Length of the RMS operation on z[t] in the Highpass Filter (2N+1)
+ - Length of the Recursive Median Filter (2M+1)
+ - Decimation factor (K)
+ - Threshold for gate generation (C)
+
+The optimal length of the `main' median filter may be found by using the
+Simple Median Filter on a piece of badly disturbed audio signal. 
+
+During tests, the Conditional Median Filter has given excellent results. 
+With the default properties (21 - 9 - 11 - 5 - 2500), nearly all ticks are
+filtered out, without audible losses in signal quality. But some rare
+musical instruments generate tones that can fool the tick detection
+algorithm, resulting in faulty interpolation. If this occurs, try to use
+the properties 15 - 11 - 9 - 4 - 2500. 
+
+
+THE FILTER FRAMEWORK
+
+(Well, we're getting more technical every minute...)
+
+Audio samples don't travel through filters out of free will. Actually,
+they are pulled through by the harddisk. This is made visible in figure 6.
+
+
+   ___________         ________          ________         ___________
+  |           |  Q    |        |        |        |  Q    |           |
+  | Harddisk  |<------|        |<- - - -|        |<------| Harddisk  |
+  |           |       |Filter 1|        |Filter N|       |           |
+  | .wav file |------>|        |- - - ->|        |------>| .wav file |
+  |___________|    S  |________|        |________|    S  |___________|
+
+  Figure 6. Questions and answers (Samples) in the signal processing
+  structure
+
+
+The destination file on the harddisk `asks' the last filter for the next
+sample (that's the Q of Question). But a filter can't produce an output
+sample without an input sample. So the last filter asks the previous
+filter for the next sample. Those questions continue till the first filter
+is reached. That filter `asks' the source file on the harddisk. Then the
+first filter can compute its output sample, and passes it through to the
+second filter. When all filters have computed their outputs, the
+destination file eventually gets the next (processed) sample.
+
+This process is easily implemented in C, as illustrated in listing 1
+below.
+
+
+    sample_t filter1()
+    {
+        sample_t nextsample;
+        sample_t procd_sample;
+
+        nextsample = read_from_file();
+        /* Do processing */
+        return procd_sample;
+    }
+
+    sample_t filter2()
+    {
+        sample_t nextsample;
+        sample_t procd_sample;
+
+        nextsample = filter1();
+        /* Do processing */
+        return procd_sample;
+    }
+
+    write_funtion()
+    {
+        sample_t nextsample;
+
+        for (...)
+        {
+            nextsample = filter2();
+            write_to_file(nextsample);
+        }
+    }
+
+  Listing 1. Example implementation of questions and answers.
+
+
+By calling filter2(), the write_function() effectively asks for the next
+sample, and stores the answer in the variable nextsample. The filters
+themselves ask the previous ones, and eventually the harddisk.
+
+With only one sample traveling, there are only very limited possibilities
+of filtering. Most filters need a few samples around the current one. For
+example, the Simple Median Filter with length 3 will need samples x[t-1],
+x[t], and x[t+1]. To accommodate this, so-called `buffers' have been
+implemented. These buffers can `remember' and `read ahead' a few samples.
+This is illustrated in figure 7.
+
+
+   ___________         ________          ________         ___________
+  |           |  Q    | :      |        | :      |  Q    |           |
+  | Harddisk  |<------| : Filt1|<- - - -| : FiltN|<------| Harddisk  |
+  |           |       |B:      |        |B:      |       |           |
+  | .wav file |------>| :      |- - - ->| :      |------>| .wav file |
+  |___________|    S  |_:______|        |_:______|    S  |___________|
+
+  Figure 7. Buffers (B) in the signal processing structure. Questions
+  (Q) and returned samples (S) stay the same.
+
+
+When the harddisk-writing-routine asks for the next sample, the `effective
+time' of the last filter is incremented by 1. So the buffer `window' of
+that filter advances one time unit. The oldest sample is discarded (e.g.
+the old x[t-2], now x[t-3]), and a new sample is needed (e.g. the new
+x[t+2]). So that buffer asks the previous filter to supply the sample for
+time-index t+2.  Then t+2 is the effective time for the last-but-one
+filter. In general, all filters have different effective times. 
+
+When starting the filtering process, all filters have an effective time
+t=0. But all buffers must get filled before the first sample appears at
+the output of the last filter, so first all buffers will fill up and the
+effective times will be adjusted automatically. During the rest of the
+process, the differences in effective times will remain constant.
+
+But, you don't have to understand anything about effective times. That's
+all embedded in the buffer routines. And it's working fine. 
+
+When we zoom in a little, the structure becomes more clear, figure 8. 
+
+
+                                 ________
+                                |        |
+                  +-------------|advance_|
+                  |             |current_|<-------------------+
+                  |    +------->|pos()   |                    |
+    params        |    |     S  |________|    params          |
+      |         Q |    |            |S          |             |
+     _V___       _V____|_          _V_       ___V____       __|___
+          | Q   |get_    |        |___| \   |        | Q   |      |
+          |<----|sample_ |        |___|  |  |get_    |<----|      |<---
+     Filt1|     |from_   |        |___|  |->|from_   |     |Filt 2|
+          |---->|filter()|        |___|  |  |buffer()|---->|      |--->
+     _____|   S |________|        |___| /   |________|   S |______|
+                                 buffer
+
+  Figure 8. Interconnection of filters and buffers.
+
+
+A filter can read from its buffer using the get_from_buffer function. This
+function has a parameter `offset', to specify which sample should be
+returned. An offset of -2 means the x[t-2] sample. 
+
+The function advance_current_pos has the effect of increasing the
+effective time by 1. In other words, it moves the buffer `window' one time
+unit further. The oldest sample is shifted out (discarded), and a brand
+new one must be shifted in. To accomplish this, the function
+get_sample_from_filter is called. This routine determines which filter
+should be questioned for the next sample, gets and returns it to the
+advance_current_pos function, that shifts it in the buffer. The
+advance_current_pos function is called once at the very beginning of each
+filter routine.
+
+The first time the advance_current_pos function is called, the buffer is
+empty. Advance_current_pos takes care that it is filled correctly, the
+first part with zeroes (silence) and from x[t] to x[t+N] with new samples,
+calling the get_sample_from_filter routine repeatedly. So, after each call
+to advance_current_pos, the buffer is completely filled and up-to-date.
+
+Each filter has its own set of parameters, that are changeable via the
+GramoFile user interface.
+
+Both filter 1 and filter 2 may be `instances' of the same filter `type'.
+For example, both may be Simple Median Filters. The software routines for
+the filters then are the same. The only things that are different are the
+parameters and the buffers. Actually, the buffer is seen as another
+parameter. During the initialization of the filtering process, a number of
+parameter-sets are created in memory. The get_sample_from_filter not only
+finds out which filter it should ask for the next sample, also it tells
+the filter which set of parameters to use. That is why the filters are
+declared like
+
+    sample_t simple_median_filter(parampointer_t parampointer)
+
+accepting a (pointer to a) set of parameters, and returning the computed
+sample.
+
+
+IMPLEMENTING NEW FILTERS
+
+Implementing a new filter shouldn't be that difficult. You don't have to
+think about reading or writing from or to a .wav file, because that has
+been implemented already. As are the buffer-functions. The only thing you
+have to worry about is the filtering algorith itself.
+
+It is a good idea to look at a simple example, to get an idea of how it
+works. Let's take the Simple Mean Filter (in signpr_mean.c). There are
+five functions:
+ - reset the parameters to some reasonable defaults
+ - provide a properties-screen by which the parameters may be changed
+ - initialize the buffers and other parameters, called just before the
+    signal processing starts
+ - delete the buffer data structures that have been used, called after the
+    signal processing has ended
+ - the filter itself
+
+A variable of the parampointer_t type is just a pointer to a param_t
+structure. Both are declared in signpr_general.h. As pointed out above,
+the buffers are part of the parameters (3 per filter, see below). Then
+there is a `filterno', that is the serial number of the filter, in other
+words the position of this particular filter in the `Selected Filters'
+panel in the `Signal Processing - Options' screen. Both buffers and
+filterno are filled in by the init_*_filter() functions. 
+
+The parameters that are settable in the user interface (using the
+*_param_screen() functions) are mostly pre- and postlengths, and an
+int and long type variable (just create more if necessary). The
+`postlength' is the number of samples that a buffer must `remember', the
+`prelength' is the `read-ahead' amount. Int1 is for example used for the
+decimation factor, and long1 for the threshold level. There are also some
+sslists, signed-short-arrays, to avoid continuous creation/deletion of
+local arrays, in an attempt so speed up the signal processing process, but
+you don't have to use these.
+
+The Simple Mean Filter is a easily understandable example of a signal
+processing routine, and it doesn't need any more explanation. Note that
+advance_current_pos() is called first of all.
+
+The Simple Median Filter (signpr_median.c) uses the sslists to
+temporarily copy the entire buffer to be sorted, in order to determine the
+median. That takes place in the median() routine that calls the qsort2()
+routine, both in signpr_general.c. The very fast sorting routine was
+adapted from the example by L. Ammeraal in `Ansi C', Academic Service,
+Schoonhoven, The Netherlands, 2nd ed., 1993.
+
+The Double Median Filter uses two buffers. That is needed because two
+median functions are present, and the second uses the results of the
+first. The block diagram from figure 4 is printed again below, now
+including names for all signals.
+
+
+                 ________
+    x[t]        |        |  z[t]                    +       y[t]
+    -------+--->| Median |-----+--------------------->O--------->
+           |    |________|     |                      ^ +
+           |                   |                      |
+           |                   |         ________     |
+           |                   V -      |        |    |
+           +------------------>O------->| Median |----+
+                              +   e[t]  |________| c[t]
+
+
+  Figure 9. Block diagram of the Double Median Filter.
+
+
+Below are example sequences of the various signals. Note that every signal
+can be computed completely when all upper signals are known. This is the
+way you would do it by hand.
+
+
+              t<0
+                 :
+    x[t]       0 : 100  50  30  80  90  10  70  50  40  20  10  80  20
+                 :      /       \___  ___/
+                 :     /            \/
+    z[t]       0 :  50 |50  50  80  80  70  50  50  40  20  20  20
+     =med(x)     :     \ |                              /
+                 :      \|                             /
+    e[t]       0 :  50   0 -20   0  10 -60  20   0   0 | 0 -10  60
+     =x-z        :                  \___  ___/         |
+                 :                      \/             |
+    c[t]       0 :   0   0   0   0   0  10   0   0   0 | 0   0
+     =med(e)     :                                     \ |
+                 :                                      \|
+    y[t]       0 :  50  50  50  80  80  80  50  50  40  20  20
+     =z+c        :
+
+
+  Figure 10. Example signals for the Double Median Filter, when both
+  median-lengths are 3. The lines point at the values needed to find the
+  lowest one.
+
+
+All filers for which you can find the answer in this way can be
+implemented in GramoFile. But you must be inventive with the use of
+buffers. Generally speaking, every computation that needs a sample other
+than one directly above it, will need a buffer. With the Double Median
+Filter, both z[t] and x[t] will need one. Well, we _can_ do with only one,
+but that's much much slower... I've implemented the Double Median Filter
+as shown below.
+
+
+        ______________________________________
+  x[t] |  |-4|-3|-2|-1|+0|+1|+2|+3|+4|+5|+6|  |
+       |__|__|__|__|__|__|__|__|__|__|__|__|__|
+                          \_____ ______/
+                       |        V
+                       |        |
+          .------------'     Median
+          |                     | z[t]
+          |   __________________V_
+          |  |-3|-2|-1|+0|+1|+2|+3| z[t]
+          |  |__|__|__|__|__|__|__|
+          |             \
+          |          - | \
+          |            V  `-----------.
+          `----------->O              |
+                    +  | e[t]         |
+                       V              |
+             \__________ _________/   |
+                        V             |
+                        |             |
+                     Median           |
+                        | c[t]        |
+                      + V             |
+                        O<------------'
+                        |  +  z[t]
+                        V
+                       y[t]
+
+  Figure 11. Schematic of a possible implementation of the Double Median
+  Filter.
+
+
+The original idea was to buffer e[t], but then we've lost z[t], which we
+need to compute y[t]. This way there is only a little drawback, for we now
+have to do one addition extra when we need e[t].
+
+The second buffer is implemented in a similar way as the `normal' buffer,
+it is accessible through the get_from_buffer() function. But filling the
+buffer works somewhat different, as the next sample can't be asked from
+the previous filter. The next sample must (generally) be computed from the
+contents of the `normal' buffer. To allow this, there is a function
+advance_current_pos_custom() that accepts a fill-function as parameter. 
+This fill-function will be called to supply the value for the samples in
+the second buffer. 
+
+As can be seen in figure 11, the fill-function for the second buffer of
+the Double Median Filter will return the median of a row of samples in the
+first buffer. Which samples should be considered, is dependent on the
+position of the to-be-computed sample in the second buffer. For example,
+z[t] is the median of x[t-2] through x[t+2], and z[t+5] is the median of
+x[t+3] through x[t+7]. The fill-function needs to know where to look, so
+some parameters have to be supplied to it, namely offset and offset_zero. 
+Offset is the position in the second buffer, and offset_zero is the
+position of the `0'-position in the second buffer relative to the
+`0'-position in the first buffer. In the case of figure 11, offset is +3
+and offset_zero is 0. Offset is supplied by advance_current_pos_custom(),
+and offset_zero must be supplied to advance_current_pos_custom(), that
+will pass it through. 
+
+Advance_current_pos_custom() should be called immediately after the call
+to the ordinary advance_current_pos(), in order to assure up-to-date
+contents of all buffers.
+
+In the case of the Double Median Filter, the main routine (the one that is
+called by get_sample_from_filter()), is double_median_filter(). The first
+thing is the customary call of advance_current_pos() that updates the
+first buffer. Then the second buffer may be updated, so
+advance_current_pos_custom() is called. The first argument is the buffer
+that should be updated, buffer2 in this case. The next argument is the
+fill-function, or, to be more specific, a pointer to that function. That
+pointer is declared just above double_median_filter(), and is of the
+fillfuncpointer_t type, defined in signpr_general.h. The third argument is
+the offset_zero. In this case, the second buffer is `fixed' at
+offset_zero=0. The last argument is the omnipresent parampointer, with the
+invaluable information about pre/postlengths etc.
+
+The fill-function double_median_filter_1() is much like an ordinary
+filter, only advance_current_pos() isn't called here (already done in the
+main routine). But the computation and returning of the computed sample
+are still there. Note that, during the computation, the offset and
+offset_zero are used to determine the interval of the median. In this
+case, the offset and offset_zero are added, as they will be in most cases.
+Offset_zero will always be 0, but is left for completeness.
+
+Back in double_median_filter(), operation continues normally. The
+structure of figure 11 is clearly visible. The `j /= 2' is there to
+prevent overflow in case sample and sample2 have different signs and large
+values. Compensation after computation of the median. Yes, this is really
+wrong, but then this filter is not meant for real use...
+
+The Conditional Median Filter (signpr_cmf.c) is even more complex, as it
+uses three buffers. The structure is illustrated in figure 12.
+
+
+             __________________________________________________
+       x[t] |  |-4|-3|-2|-1|+0|+1|+2|+3|+4|+5|+6|+7|+8|+9|  |  |
+            |__|__|__|__|__|__|__|__|__|__|__|__|__|__|__|__|__|
+                                                    \__ ___/
+                \___________ ____________/             V
+                            V                          |
+                            |                       Highpass
+        ,-------------------'                          | z[t]
+        |                            __________________V_
+        |                      z[t] |-3|-2|-1|+0|+1|+2|+3|
+        |                           |__|__|__|__|__|__|__|
+        |                            \________ _________/
+        |                                     V
+        |                                     |
+        |    ,--------------.                RMS
+        |    |              |                 | w[t]
+        |    |     _________V_________________V_
+        |    |    |-3|-2|-1|+0|+1|+2|+3|+4|+5|+6| w[t]
+        |    |    |__|__|__|__|__|__|__|__|__|__|
+        |    |               \
+        |    |                `---------------------.
+        |    |                                      |
+        |    |     \________ ___ ___ ___ ___ __/    |
+        |    |              V     (decimate)        |
+        |    |              |                       |
+        |    |           Median                     |
+        |    |         b[t] |                       |
+        |    |             /|  ,--------------------'
+        |    `------------' |  | w[t]
+        |                   V  V
+        |                 Compare
+        |                    | g[t]
+        V     gate           |
+     Median <----------------'
+        |
+        |
+        V
+      y[t]
+
+  Figure 12. Schematic of the implementation of the Conditional Median
+  Filter.
+
+
+The general structure of the implementation resembles that of the Double
+Median Filter. Some custom fill-functions are used to fill the two `extra'
+buffers. In particular the buffer of w[t] is necessary, due to the
+recursive nature of the computation that is done with it. The recursive
+median is implemented as an ordinary median, but after each computation,
+the result is stored again in the w[t] buffer. This is dune with the
+put_in_buffer() function (we grab w_t before putting the new value in its
+place). Decimation is accomoplished by selecting only a few of the
+pre-read samples of w[t], and computing the median thereof. 
+
+In the main filter routine, cond_median_filter(), there is first the
+customary call of advance_current_pos, and thereafter only one call to
+advance_current_pos_custom(), for the third buffer that is fixed at
+offset_zero=0. The second buffer is not fixed, but `floats' with the
+to-be-computed offset in the third buffer. The second buffer is therefore
+updated in the fill-function of the third buffer. The offset_zero of the
+second buffer is offset + offset_zero (both of the third buffer, the
+latter being 0). In the situation of figure 12, the offset in the third
+buffer is +6, so the offset_zero of the second buffer also is +6. The
+fill-function of the second buffer is supplied with its own offset, +3 in
+the case of figure 12. The second derivative (`highpass operation') now
+needs to be computed for the offset+offset_zero = 9th sample in the first
+buffer.
+
+Special care should be taken when allocating the first buffer in the
+init_*_filter() functions, as there may be more places where the samples
+in the buffer are accessed. In the Conditional Median Filter, the samples
+in the first buffer are accessed by the main routine, that computes the
+median if needed, and by the fill-function of the second buffer, that
+computes the second derivative (highpass). So, the buffer must be big
+enough to accommodate the median. The highpass function is different, as
+it `floats'. During the first filling of the buffers (when the first
+sample is asked by the harddisk), all offsets and offset_zeroes are 0, so
+the highpass needs samples x[t-1], x[t] and x[t+1]. When all buffers are
+filled, the middle of the highpass lies at the added values of the
+`prelengths' of the second and third filter. In the case of figure 12, the
+minimal prelength of the first buffer is 6 + 3 + 1 (the `right side' of
+the second derivative) = 10. In that example, the median requires x[t-4]
+through x[t+4], and the highpass requires x[t-1] through x[t+10], so the
+first buffer must at least contain x[t-4] through x[t+10]. 
+
+If you want to implement a new filter, it is generally a good idea to
+start with a numeric example like figure 10. It gives a good overview of
+the filter, and also a way to verify the correctness of the implementation
+in a later phase. With such a numeric example, the drawing of a diagram
+like figures 11 and 12 isn't too difficult. After that, implementing
+should be straightforward.
+
+If there are problems with either this document or the implementation of a
+new filter, you can contact me. See the general `README' file for more
+information. If it is an implementation problem, the inclusion of drawings
+like figures 4, 5, 9, 10, 11 and 12 is highly recommended. Also, if you
+have succeeded in implementing a new filter, please send the source files
+and documentation to me, so that it can be included in a next release of
+GramoFile.
+
+
+

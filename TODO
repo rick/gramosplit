@@ -1,0 +1,105 @@
+
+Things that could/should be done (random order) - but not by me: I've got
+other things to do at the moment :(
+
+ - Find and correct all bugs
+ - Better error handling (malloc, file ops)
+ - Support (user interface) for cdrecord, cdda2wav/cdparanoia
+ - More / better filters  - pops/ticks/scratches
+                          - hiss, broadband noise
+                          - fade in/out at track start/end (see below)
+                          - volume normalizing to put tracks from
+                             various sources on one CD
+                          - dynamic-range decompression (Keith Refson's idea)
+ - Possibility for application of frequency domain filters (probably
+    difficult to do in streaming processing)
+ - Remember filter/track location settings within a single invocation
+    (Also see patch from James Tappin on the webpage)
+ - Make .wav reading/writing 64-bit clean (i.e. don't depend on sizeof's)
+    (temporary workaround: change every `long' into `int', see README)
+ - Compute average/maximal signal volume/power for info-screen after
+    recording (sum of 1G shorts in a float) (see bplaysrc/shmbuf.c,
+    shmrec())
+ - Show number of nearly-clipped samples also _during_ recording, for
+    easier adjustments of sound source (idea of Juergen Lock)
+ - Copying, moving, deleting files; creating, deleting dirs from
+    within user interface (?)
+ - Automatic detection which of xmixer, xmix, aumix, ???mix to use
+    (e.g. $DISPLAY ? or $MIXER ?)
+ - Auto screensize (not always 80x24)
+ - X user interface
+ - Manpage
+ - Support for non-CD-quality and non-.wav sound files;
+    (for mono files, also see patch from James Tappin on the webpage)
+ - Command line options (or via a options file)
+ - Porting to other *UXes, Windows? First only Signproc/Tracksplit
+    (IRIX and possibly others should work already. If you try, please mail
+    me your experiences)
+ - For webpage: example .wavs, example graph files (track location),
+    screenshots of (un)processed .wavs
+
+
+Fade in/out:
+
+Paul Martin <pm@nowster.zetnet.co.uk> sent me the following:
+
+-----quote-----
+[...]
+Here's a fragment of code that does a mono fade out. It's very
+sub-optimal, but it does work. It implements a (1-x^2) fade (x = 0 -> 1). 
+By changing the exponent you can change the type of fade from linear (x^1)
+to highly logarithmic.
+[...]
+
+#include <math.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+const char inname[]="input.sw";
+const char outname[]="output.sw";
+
+signed short buff[441000];
+
+main () {
+ double frac,scaler;
+ long i,size,max;
+ int inp,oup;
+ signed short tmp;
+ 
+ if ((inp=open(inname,O_RDONLY))==-1) {
+  perror("open('input.sw')");
+  exit(1);
+ }
+ size = read(inp, buff, sizeof(buff));
+ close(inp);
+ max = (size/2);
+
+ for (i=0; i<max; i++) {
+  frac=(double) i / (double) max;
+  scaler = 1.0 - (frac)*(frac); /* this is the important bit */
+/* scaler = 1.0 - (1.0-frac)*(1.0-frac); /* fade in */
+
+  tmp = (signed short) ( ( (double) buff[i]) * scaler);
+/*  printf("%d %f %d %d\n", i, scaler, buff[i], tmp ); */
+  buff[i]=tmp;
+ }
+
+ oup=creat(outname,0644);
+ write(oup,buff,size);
+ close(oup);
+}
+-----end of quote-----
+
+Idea seems to be useable. Exponent may be settable in a Parameters screen
+(then scaler=pow(frac,log_factor)), as well as the length of fade in and
+fade out (in samples, or e.g. 1/100 sec?). But for correct implementation,
+a current_sample_position has to be added to param_t, that is updated
+every sample (in advance_current_pos() ?). Otherwise, the pre-reading of
+the buffers will make it go all wrong (note that the fade in/out must be
+placeable anywhere in the processing chain). Also, track_start/end
+(samples or bytes) or tracktimes[] must be global vars. 
+

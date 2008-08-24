@@ -1,0 +1,139 @@
+
+In version 1.4 of GramoFile, a entirely new track location algorithm is
+implemented, which will be briefly discussed here. The various values
+mentioned are the defaults offered in GramoFile 1.4 (and higher). Also, a
+procedure is described that you may follow to get more or less optimal
+track location.
+
+
+TRACK LOCATION
+
+First of all, a `power profile' of the sound file is created, by taking
+the Root-Mean-Square (`RMS') of 4410 samples of the signal. We get
+something like: 
+
+
+                                            |     |
+             |     ||                   ||  ||  |||             ||  |  ||
+       |  | || |||||||                 ||||||||||||||           ||| ||||||
+      ||||| ||||||||||||              |||||||||||||||||         ||||||||||
+      ||||||||||||||||||              |||||||||||||||||        |||||||||||
+      |||||||||||||||||||            ||||||||||||||||||       ||||||||||||
+     |||||||||||||||||||||          ||||||||||||||||||||      |||||||||||||
+     |||||||||||||||||||||||     |||||||||||||||||||||||     ||||||||||||||
+ |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+  ^            ^              ^             ^             ^        ^        ^
+ silence     track         silence        track        silence   track silence
+
+
+The RMS-computation takes quite some time. Therefore the (binary)RMS-data
+may/will be saved to a `.rms' file. This .rms file contains all
+information necessary to locate tracks (the .wav file is not needed any
+more). 
+
+To beautify the data a little, a running median (length 3) is applied. The
+above graph gets a little smoother by doing this. The result of this
+operation may be saved to a .med `graph file', that shows a rotated (and
+much longer) version of the graph above.
+
+Then, a first coarse track location will be applied. This is simply
+walking through the `.med data' and finding sequences that are either
+above (= possible track) or below (= possible silence) a certain
+threshold, the `global silence threshold'. 
+
+This global silence threshold is different for each sound file. To
+`automatically' find a reasonable threshold, first a minimum threshold and
+a maximum threshold are computed. The minimum threshold is (about) the
+lowest `.med value' in the data set. The maximum threshold is the middle
+`.med value' (that's usually very close to the mean `.med value'). To find
+these, the `.med data' is sorted, and we get something like this: 
+
+
+ min. thresh.                     max. thresh.                               |
+    v                                  v                                    ||
+                                                                          ||||
+                                                                        ||||||
+                                                                    ||||||||||
+                                                ||||||||||||||||||||||||||||||
+                            ||||||||||||||||||||||||||||||||||||||||||||||||||
+               |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+           |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+ |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+      ^                                        ^
+ collected silence                           music
+
+
+The minimum silence now is the 10th element in the sorted data, and the
+maximum threshold is the middle element. The sorted data may also be saved
+to a .sor `graph file'.
+
+When these min and max thresholds are found, the real global silence
+threshold is found by taking a value between the min anc max threshold. 
+Default, that value lies on 15% (= 150 * 0.1%, which seems to work well in
+most cases), as shown below:
+
+
+                        value `Global silence factor'
+                            in Parameter-screen
+                                     |
+                                     V
+
+            maximum threshold      1000     100% --
+                                                 --
+                                                 --
+                                                 --
+                                                 --
+                                                 --
+                                                 --
+     ->  global_silence_threshold   150      15% --
+                                                 --
+            minimum threshold         0       0% --
+
+
+When the possible tracks and silences have been located, they are
+`transformed' into certain tracks / silences by applying a few `rules'. 
+The most important one is that possible tracks longer than 50 blocks (= 5
+seconds when using 4410-sample blocks) are certain tracks, and possible
+silences longer than 20 blocks (= 2 seconds) are certain silences. For
+more information, see the funtion tracksplit_findtracks() in the file
+tracksplit.c. 
+
+To detect the track starts/ends more correctly, new local thresholds are
+computed, by taking the mean of the .med's within the individual silences
+and adding 5% on top of that (the `Local silence factor'). The tracks
+adjecent to a silence are now extended using the local threshold.
+
+Finally the detected `certain tracks' are extended a bit by adding 3
+blocks (0.3 secs) before and 6 blocks (0.6 secs) after the detected track.
+This is to account for fade-in/fade-out effects, that are hard to detect.
+
+When all this is done, track location is completed. The detected location
+of the tracks is written to the .tracks file. 
+
+
+PROCEDURE
+
+The best way to use track location is this:
+
+ - First, try track location with the default parameters.
+ - If too few tracks are detected, check if the `minimal length of inter-
+    track silences' is correct. Some records require 10 (blocks).
+ - If inter-track silence was not the problem, try to increase the `global
+    silence factor' to for example 250 or 350. Really weird recordings may
+    need even higher values, but 1000 should really be enough.
+ - It is generally _no_ problem if 2 or 3 tracks too much are detected.
+ - When you're satisfied with the automatic detection, you may fine-tune/
+    adjust the starts/ends manually, using a text editor and the `Play'-
+    `Track' option. You may have to join some tracks, but that won't be
+    too difficult.
+
+
+If you encounter a situation in which the track splitting (still) doesn't
+function properly, you can contact me about it. You may include the .rms
+file of the .wav you're having problems with, and describe your problem as
+clearly and completely as possible. Also, corrections, additions,
+suggestions and compliments are heartily welcomed.  Contact information is
+in the general `README' file. 
+
